@@ -19,7 +19,6 @@
 		DF9174771F1D6DC00034632D /* FixLayout+Enum.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9174761F1D6DC00034632D /* FixLayout+Enum.swift */; };
 		DF9174791F1D6DEA0034632D /* UIView+FlexLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9174781F1D6DEA0034632D /* UIView+FlexLayout.swift */; };
 		DF95D9C11F20BD06003073D5 /* FlexLayout.h in Headers */ = {isa = PBXBuildFile; fileRef = DF95D9BF1F20BD06003073D5 /* FlexLayout.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DF95D9C21F20BD06003073D5 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = DF95D9C01F20BD06003073D5 /* Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -258,7 +257,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				249008D41F165D4C00BBE9CD /* Info.plist in Resources */,
-				DF95D9C21F20BD06003073D5 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
