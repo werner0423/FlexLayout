@@ -21,7 +21,7 @@ import FlexLayoutYogaKit
  FlexLayout interface.
  
  The interface is accessible from any UIView class instance:
- ``` 
+ ```
     label.flex.margin(10)
  ```
  */
@@ -44,6 +44,10 @@ public final class Flex {
         return yoga.intrinsicSize
     }
     
+    public var isScalable = true
+    public var isWholeScalable = true
+    public var scaled = false
+    
     init(view: UIView) {
         self.view = view
         self.yoga = view.yoga
@@ -52,6 +56,20 @@ public final class Flex {
         yoga.isEnabled = true
     }
 
+    // only disable current view scalablity, **not** include subviews
+    @discardableResult
+    public func disableScalablity() -> Flex {
+        isScalable = false
+        return self
+    }
+    
+    // disable current view scalablity, include subviews
+    @discardableResult
+    public func disableWholeScalablity() -> Flex {
+        isWholeScalable = false
+        return self
+    }
+    
     //
     // MARK: Flex item addition and definition
     //
@@ -78,12 +96,65 @@ public final class Flex {
     public func addItem(_ view: UIView) -> Flex {
         if let host = self.view {
             host.addSubview(view)
+            
+            // calculate width smaller a little in some occasions
+            // fix with paddingEnd temporarily
+            if view is UILabel {
+                view.flex.paddingEnd(0.1)
+            }
+            return view.flex
+        } else {
+            preconditionFailure("Trying to modify deallocated host view")
+        }
+    }
+    
+    @discardableResult
+    public func insertItem(belowSubview siblingSubview: UIView) -> Flex {
+        let view = UIView()
+        return insertItem(view, belowSubview: siblingSubview)
+    }
+    
+    @discardableResult
+    public func insertItem(aboveSubview siblingSubview: UIView) -> Flex {
+        let view = UIView()
+        return insertItem(view, aboveSubview: siblingSubview)
+    }
+    
+    @discardableResult
+    public func insertItem(_ view: UIView, belowSubview siblingSubview: UIView) -> Flex {
+        if let host = self.view {
+            host.insertSubview(view, belowSubview: siblingSubview)
+            return view.flex
+        } else {
+            preconditionFailure("Trying to modify deallocated host view")
+        }
+    }
+    
+    @discardableResult
+    public func insertItem(_ view: UIView, aboveSubview siblingSubview: UIView) -> Flex {
+        if let host = self.view {
+            host.insertSubview(view, aboveSubview: siblingSubview)
             return view.flex
         } else {
             preconditionFailure("Trying to modify deallocated host view")
         }
     }
 
+    @discardableResult
+    public func removeAllItems() -> Flex {
+        if let host = self.view {
+            for subview in host.subviews {
+                subview.removeFromSuperview()
+                subview.flex.markDirty()
+                subview.clearYoga()
+                subview.clearFlex()
+            }
+            return host.flex
+        } else {
+            preconditionFailure("Trying to modify deallocated host view")
+        }
+    }
+    
     /**
      This method is used to structure your code so that it matches the flexbox structure. The method has a closure parameter with a
      single parameter called `flex`. This parameter is in fact, the view's flex interface, it can be used to adds other flex items
@@ -143,7 +214,7 @@ public final class Flex {
 
     /**
      The framework is so highly optimized, that flex item are layouted only when a flex property is changed and when flex container
-     size change. In the event that you want to force FlexLayout to do a layout of a flex item, you can mark it as dirty 
+     size change. In the event that you want to force FlexLayout to do a layout of a flex item, you can mark it as dirty
      using `markDirty()`.
      
      Dirty flag propagates to the root of the flexbox tree ensuring that when any item is invalidated its whole subtree will be re-calculated
@@ -154,6 +225,24 @@ public final class Flex {
     public func markDirty() -> Flex {
         yoga.markDirty()
         return self
+    }
+    
+    @discardableResult
+    public func markAllLabelAndButtonsDirty() -> Flex {
+        if let host = self.view {
+            for subview in host.subviews {
+                if subview is UILabel {
+                    subview.flex.markDirty()
+                } else if subview is UIButton {
+                    subview.flex.markDirty()
+                } else if subview.subviews.count > 0 {
+                    subview.flex.markAllLabelAndButtonsDirty()
+                }
+            }
+            return self
+        } else {
+            preconditionFailure("Trying to modify deallocated host view")
+        }
     }
     
     /**
@@ -173,11 +262,11 @@ public final class Flex {
     /**
      The `direction` property establishes the main-axis, thus defining the direction flex items are placed in the flex container.
     
-     The `direction` property specifies how flex items are laid out in the flex container, by setting the direction of the flex 
+     The `direction` property specifies how flex items are laid out in the flex container, by setting the direction of the flex
      container’s main axis. They can be laid out in two main directions,  like columns vertically or like rows horizontally.
     
-     Note that row and row-reverse are affected by the layout direction (see `layoutDirection` property) of the flex container. 
-     If its text direction is LTR (left to right), row represents the horizontal axis oriented from left to right, and row-reverse 
+     Note that row and row-reverse are affected by the layout direction (see `layoutDirection` property) of the flex container.
+     If its text direction is LTR (left to right), row represents the horizontal axis oriented from left to right, and row-reverse
      from right to left; if the direction is rtl, it's the opposite.
     
      - Parameter value: Default value is .column
@@ -200,8 +289,8 @@ public final class Flex {
     }
     
     /**
-     Direction defaults to Inherit on all nodes except the root which defaults to LTR. It is up to you to detect the 
-     user’s preferred direction (most platforms have a standard way of doing this) and setting this direction on the 
+     Direction defaults to Inherit on all nodes except the root which defaults to LTR. It is up to you to detect the
+     user’s preferred direction (most platforms have a standard way of doing this) and setting this direction on the
      root of your layout tree.
     
      - Parameter value: new LayoutDirection
@@ -230,8 +319,8 @@ public final class Flex {
     //
     
     /**
-     The `justifyContent` property defines the alignment along the main-axis of the current line of the flex container. 
-     It helps distribute extra free space leftover when either all the flex items on a line have reached their maximum 
+     The `justifyContent` property defines the alignment along the main-axis of the current line of the flex container.
+     It helps distribute extra free space leftover when either all the flex items on a line have reached their maximum
      size. For example, if children are flowing vertically, `justifyContent` controls how they align vertically.
     
      - Parameter value: Default value is .start
@@ -257,7 +346,7 @@ public final class Flex {
     
     /**
      The `alignSelf` property controls how a child aligns in the cross direction, overriding the `alignItems`
-     of the parent. For example, if children are flowing vertically, `alignSelf` will control how the flex item 
+     of the parent. For example, if children are flowing vertically, `alignSelf` will control how the flex item
      will align horizontally.
     
      - Parameter value: Default value is .auto
@@ -291,8 +380,8 @@ public final class Flex {
     //
     
     /**
-     The `grow` property defines the ability for a flex item to grow if necessary. It accepts a unitless value 
-     that serves as a proportion. It dictates what amount of the available space inside the flex container the 
+     The `grow` property defines the ability for a flex item to grow if necessary. It accepts a unitless value
+     that serves as a proportion. It dictates what amount of the available space inside the flex container the
      item should take up.
     
      - Parameter value: Default value is 0
@@ -304,13 +393,13 @@ public final class Flex {
     }
     
     /**
-     It specifies the "flex shrink factor", which determines how much the flex item will shrink relative to the 
+     It specifies the "flex shrink factor", which determines how much the flex item will shrink relative to the
      rest of the flex items in the flex container when there isn't enough space on the main-axis.
     
-     When omitted, it is set to 0 and the flex shrink factor is multiplied by the flex `basis` when distributing 
+     When omitted, it is set to 0 and the flex shrink factor is multiplied by the flex `basis` when distributing
      negative space.
     
-     A shrink value of 0 keeps the view's size in the main-axis direction. Note that this may cause the view to 
+     A shrink value of 0 keeps the view's size in the main-axis direction. Note that this may cause the view to
      overflow its flex container.
     
      - Parameter value: Default value is 0
@@ -325,7 +414,7 @@ public final class Flex {
      This property takes the same values as the width and height properties, and specifies the initial size of the
      flex item, before free space is distributed according to the grow and shrink factors.
     
-     Specifying `nil` set the basis as `auto`, which means the length is equal to the length of the item. If the 
+     Specifying `nil` set the basis as `auto`, which means the length is equal to the length of the item. If the
      item has no length specified, the length will be according to its content.
     
      - Parameter value: Default value is 0
@@ -340,7 +429,7 @@ public final class Flex {
      This property takes the same values as the width and height properties, and specifies the initial size of the
      flex item, before free space is distributed according to the grow and shrink factors.
     
-     Specifying `nil` set the basis as `auto`, which means the length is equal to the length of the item. If the 
+     Specifying `nil` set the basis as `auto`, which means the length is equal to the length of the item. If the
      item has no length specified, the length will be according to its content.
     */
     @discardableResult
@@ -353,7 +442,7 @@ public final class Flex {
     // MARK: Width / height / height
     //
     
-    /** 
+    /**
      The value specifies the view's width in pixels. The value must be non-negative.
     */
     @discardableResult
@@ -485,7 +574,7 @@ public final class Flex {
     }
     
     /**
-     AspectRatio is a property introduced by Yoga that don't exist in CSS. AspectRatio solves the problem of knowing 
+     AspectRatio is a property introduced by Yoga that don't exist in CSS. AspectRatio solves the problem of knowing
      one dimension of an element and an aspect ratio, this is very common when it comes to images, videos, and other
      media types. AspectRatio accepts any floating point value > 0, the default is undefined.
     
@@ -1181,7 +1270,7 @@ public final class Flex {
         case end
         /// Lines are evenly distributed in the flex container
         case spaceBetween
-        /// Lines are evenly distributed in the flex container, with half-size spaces on either end	Play it »
+        /// Lines are evenly distributed in the flex container, with half-size spaces on either end    Play it »
         case spaceAround
     }
     
@@ -1197,6 +1286,7 @@ public final class Flex {
         /// Items are positioned at the end of the container
         case end
         /// Items are positioned at the baseline of the container
+        // Not currently supported by Yoga.
         case baseline
     }
     
@@ -1276,4 +1366,139 @@ public final class Flex {
         case hidden
         case scroll
     }*/
+}
+
+// MARK: - Scalable
+public extension Flex {
+    func scalable(force: Bool = false, base: ScaleBase = .width, referenceSize: CGSize = CGSize(width: 375, height: 667)) {
+        guard let view = self.view else { return }
+        
+        if view.isFlexEnabled && view.isYogaEnabled && (!scaled || force) {
+            if isScalable && isWholeScalable {
+                scalableYoga(yoga: yoga, base: base, referenceSize: referenceSize)
+                scaled = true
+            }
+            
+            if isWholeScalable {
+                for subview in view.subviews {
+                    if subview.isFlexEnabled && subview.isYogaEnabled {
+                        subview.flex.scalable(base: base, referenceSize: referenceSize)
+                    }
+                }
+            }
+        }
+    }
+    
+    internal func scalableYoga(yoga: YGLayout, base: ScaleBase = .width, referenceSize: CGSize = CGSize(width: 375, height: 667)) {
+        if checkYGValue(value: yoga.top) {
+            yoga.top.value = scalableValue(value: yoga.top.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.left) {
+            yoga.left.value = scalableValue(value: yoga.left.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.bottom) {
+            yoga.bottom.value = scalableValue(value: yoga.bottom.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.right) {
+            yoga.right.value = scalableValue(value: yoga.right.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.width) {
+            yoga.width.value = scalableValue(value: yoga.width.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.height) {
+            yoga.height.value = scalableValue(value: yoga.height.value, base: base, referenceSize: referenceSize)
+        }
+        
+        if checkYGValue(value: yoga.marginTop) {
+            yoga.marginTop.value = scalableValue(value: yoga.marginTop.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.marginLeft) {
+            yoga.marginLeft.value = scalableValue(value: yoga.marginLeft.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.marginBottom) {
+            yoga.marginBottom.value = scalableValue(value: yoga.marginBottom.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.marginRight) {
+            yoga.marginRight.value = scalableValue(value: yoga.marginRight.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.marginHorizontal) {
+            yoga.marginHorizontal.value = scalableValue(value: yoga.marginHorizontal.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.marginVertical) {
+            yoga.marginVertical.value = scalableValue(value: yoga.marginVertical.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.margin) {
+            yoga.margin.value = scalableValue(value: yoga.margin.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.marginStart) {
+            yoga.marginStart.value = scalableValue(value: yoga.marginStart.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.marginEnd) {
+            yoga.marginEnd.value = scalableValue(value: yoga.marginEnd.value, base: base, referenceSize: referenceSize)
+        }
+
+        if checkYGValue(value: yoga.paddingTop) {
+            yoga.paddingTop.value = scalableValue(value: yoga.paddingTop.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.paddingLeft) {
+            yoga.paddingLeft.value = scalableValue(value: yoga.paddingLeft.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.paddingBottom) {
+            yoga.paddingBottom.value = scalableValue(value: yoga.paddingBottom.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.paddingRight) {
+            yoga.paddingRight.value = scalableValue(value: yoga.paddingRight.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.paddingHorizontal) {
+            yoga.paddingHorizontal.value = scalableValue(value: yoga.paddingHorizontal.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.paddingVertical) {
+            yoga.paddingVertical.value = scalableValue(value: yoga.paddingVertical.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.padding) {
+            yoga.padding.value = scalableValue(value: yoga.padding.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.paddingStart) {
+            yoga.paddingStart.value = scalableValue(value: yoga.paddingStart.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.paddingEnd) {
+            yoga.paddingEnd.value = scalableValue(value: yoga.paddingEnd.value, base: base, referenceSize: referenceSize)
+        }
+
+        if checkYGValue(value: yoga.minWidth) {
+            yoga.minWidth.value = scalableValue(value: yoga.minWidth.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.minHeight) {
+            yoga.minHeight.value = scalableValue(value: yoga.minHeight.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.maxWidth) {
+            yoga.maxWidth.value = scalableValue(value: yoga.maxWidth.value, base: base, referenceSize: referenceSize)
+        }
+        if checkYGValue(value: yoga.maxHeight) {
+            yoga.maxHeight.value = scalableValue(value: yoga.maxHeight.value, base: base, referenceSize: referenceSize)
+        }
+    }
+    
+    internal func checkYGValue(value: YGValue) -> Bool {
+        return (value.unit == .point || value.unit == .percent || value.unit == .undefined)
+    }
+    
+    internal func scalableYGValue(value: YGValue, base: ScaleBase = .width, referenceSize: CGSize = CGSize(width: 375, height: 667)) -> YGValue {
+        var ygValue = value
+        if value.unit == .point || value.unit == .percent || value.unit == .undefined {
+            ygValue.value = scalableValue(value: ygValue.value, base: base, referenceSize: referenceSize)
+        }
+        return ygValue
+    }
+    
+    internal func scalableValue(value: Float, base: ScaleBase = .width, referenceSize: CGSize = CGSize(width: 375, height: 667)) -> Float {
+        let referenceWidth = Float(referenceSize.width), referenceHeight = Float(referenceSize.height)
+        let screenWidth = Float(UIScreen.main.bounds.width), screenHeight = Float(UIScreen.main.bounds.height)
+        
+        return (value * (base == .width ? (screenWidth / referenceWidth) : (screenHeight / referenceHeight)))
+    }
+    
+    enum ScaleBase {
+        case width, height
+    }
 }
